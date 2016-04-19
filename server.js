@@ -43,7 +43,7 @@ app.get('/todos', middleware.requireAuthentication, function(req, res) {
 });
 
 // GET /todos/:id
-app.get('/todos/:id' , middleware.requireAuthentication, function(req, res) {
+app.get('/todos/:id', middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
 
 	db.todo.findById(todoId).then(function(todo) {
@@ -62,7 +62,11 @@ app.post('/todos', middleware.requireAuthentication, function(req, res) {
 	var body = _.pick(req.body, 'description', 'completed');
 
 	db.todo.create(body).then(function(todo) {
-		res.json(todo.toJSON());
+		req.user.addTodo(todo).then(function() {
+			return todo.reload();
+		}).then(function(todo) {
+			res.json(todo.toJSON());
+		});
 	}, function(e) {
 		res.status(400).json(e);
 	});
@@ -118,34 +122,36 @@ app.put('/todos/:id', middleware.requireAuthentication, function(req, res) {
 	});
 });
 
-app.post('/users', function (req, res) {
+app.post('/users', function(req, res) {
 	var body = _.pick(req.body, 'email', 'password');
 
-	db.user.create(body).then(function (user) {
+	db.user.create(body).then(function(user) {
 		res.json(user.toPublicJSON());
-	}, function (e) {
+	}, function(e) {
 		res.status(400).json(e);
 	});
 });
 
 // POST /users/login
-app.post('/users/login', function (req, res) {
+app.post('/users/login', function(req, res) {
 	var body = _.pick(req.body, 'email', 'password');
 
-	db.user.authenticate(body).then(function (user) {
+	db.user.authenticate(body).then(function(user) {
 		var token = user.generateToken('authentication');
 
 		if (token) {
-			res.header('Auth', token).json(user.toPublicJSON());	
+			res.header('Auth', token).json(user.toPublicJSON());
 		} else {
 			res.status(401).send();
 		}
-	}, function () {
+	}, function() {
 		res.status(401).send();
 	});
 });
 
-db.sequelize.sync({force: true}).then(function() {
+db.sequelize.sync({
+	force: true
+}).then(function() {
 	app.listen(PORT, function() {
 		console.log('Express listening on port ' + PORT + '!');
 	});
